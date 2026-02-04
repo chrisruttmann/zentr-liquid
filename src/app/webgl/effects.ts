@@ -255,8 +255,14 @@ export class MetaLogo extends Effect {
 
   mouse = new Vec2()
   prevMouse = new Vec2()
+  canvasTexture2: CanvasTexture | null = null
 
   onMouseMove: ((x: number, y: number) => void) | null = null
+
+  setTexture2(tex: CanvasTexture) {
+    this.canvasTexture2 = tex
+    if (this.mesh) this.mesh.uniforms.Texture2.value = tex
+  }
 
   mount(canvasTexture: CanvasTexture) {
     const gl = this.renderer.gl
@@ -265,7 +271,7 @@ export class MetaLogo extends Effect {
       this.geometry,
       new Program(gl, VERTEX_SHADER, META_LOGO_FS, {
         Texture1: { value: canvasTexture },
-        Texture2: { value: canvasTexture },
+        Texture2: { value: this.canvasTexture2 || canvasTexture },
         Color: { value: [1, 1, 1] as [number, number, number] },
         Background: { value: [0, 0, 0] as [number, number, number] },
         Size: { value: new Vec2(this.renderer.width, this.renderer.height) },
@@ -310,7 +316,7 @@ export class MetaLogo extends Effect {
     this.mesh.uniforms.Strength.value = this.params.strength
     this.mesh.uniforms.Size2.value = this.params.size
     this.mesh.uniforms.Texture1.value = this.canvasTexture
-    this.mesh.uniforms.Texture2.value = this.canvasTexture
+    this.mesh.uniforms.Texture2.value = this.canvasTexture2 || this.canvasTexture
     this.mesh.uniforms.SizeImage.value = new Vec2(this.canvasTexture.width, this.canvasTexture.height)
   }
 

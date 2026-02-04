@@ -4,136 +4,120 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import { Renderer, CanvasTexture } from "./webgl/renderer"
 import { Effect, createEffect, EFFECT_ORDER, RepeatOverlap, MetaLogo, DoubleLogo, MouseGrid } from "./webgl/effects"
 
-// ─── Debug panel styles (matches 27b exactly) ───────────────────────────────
+// ─── Panel styles ─────────────────────────────────────────────────────────────
 const PANEL_CSS = `
-.debug-panel {
+.panel {
   position: fixed;
   top: 16px;
   right: 16px;
-  width: 220px;
-  background: rgba(30,30,30,0.92);
-  backdrop-filter: blur(8px);
-  border-radius: 8px;
-  color: #ccc;
+  width: 200px;
+  background: rgba(20,20,20,0.88);
+  backdrop-filter: blur(12px);
+  border-radius: 10px;
+  color: #aaa;
   font-family: "SF Mono", "Fira Code", monospace;
   font-size: 11px;
   line-height: 1.5;
   z-index: 100;
   user-select: none;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
-  overflow: hidden;
-}
-.debug-section {
-  padding: 8px 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-}
-.debug-section:last-child { border-bottom: none; }
-.debug-header {
+  box-shadow: 0 4px 32px rgba(0,0,0,0.5);
+  padding: 14px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
-  color: #fff;
-  font-size: 11px;
-  margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  flex-direction: column;
+  gap: 12px;
 }
-.debug-header .toggle {
-  cursor: pointer;
-  opacity: 0.5;
-  font-size: 14px;
-}
-.debug-row {
+.panel-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 3px 0;
 }
-.debug-row label {
-  width: 72px;
+.panel-row label {
+  width: 36px;
   flex-shrink: 0;
-  color: #999;
+  color: #666;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
-.debug-row .val {
-  width: 42px;
+.panel-row .val {
+  width: 34px;
   text-align: right;
   flex-shrink: 0;
   color: #fff;
   font-variant-numeric: tabular-nums;
+  font-size: 10px;
 }
-.debug-row input[type=range] {
+.panel-row input[type=range] {
   flex: 1;
   -webkit-appearance: none;
-  height: 3px;
-  background: rgba(255,255,255,0.2);
-  border-radius: 2px;
+  height: 2px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 1px;
   outline: none;
 }
-.debug-row input[type=range]::-webkit-slider-thumb {
+.panel-row input[type=range]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 11px;
-  height: 11px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: #fff;
   cursor: pointer;
 }
-.debug-select {
-  width: 100%;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 4px;
+.panel-select {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px;
   color: #fff;
   font-family: inherit;
   font-size: 11px;
   padding: 4px 6px;
   cursor: pointer;
-  margin-top: 2px;
+  outline: none;
 }
-.debug-select option { background: #222; color: #fff; }
-.debug-btn {
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 4px;
+.panel-select option { background: #1a1a1a; color: #fff; }
+.panel-input {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px;
   color: #fff;
   font-family: inherit;
   font-size: 11px;
-  padding: 3px 10px;
-  cursor: pointer;
-  margin-top: 2px;
+  padding: 4px 6px;
+  outline: none;
 }
-.debug-btn:hover { background: rgba(255,255,255,0.2); }
+.panel-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.07);
+}
+.panel-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.panel-top .fps {
+  color: #555;
+  font-size: 10px;
+}
 .preset-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 .preset-btn {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 3px;
-  color: #aaa;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px;
+  color: #777;
   font-family: inherit;
   font-size: 10px;
   padding: 3px 4px;
   cursor: pointer;
   text-align: center;
 }
-.preset-btn:hover, .preset-btn.active { background: rgba(255,255,255,0.18); color: #fff; border-color: rgba(255,255,255,0.3); }
-.fps-bar {
-  display: flex;
-  align-items: flex-end;
-  gap: 1px;
-  height: 24px;
-  margin-top: 4px;
-}
-.fps-bar span {
-  flex: 1;
-  background: rgba(255,255,255,0.25);
-  border-radius: 1px 1px 0 0;
-  transition: height 0.1s;
-}
+.preset-btn:hover { background: rgba(255,255,255,0.14); color: #fff; border-color: rgba(255,255,255,0.2); }
 `
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -150,6 +134,7 @@ export default function Home() {
   const rafRef = useRef<number>(0)
   const lastTimeRef = useRef(0)
   const canvasTextureRef = useRef<CanvasTexture | null>(null)
+  const canvasTextureBlurRef = useRef<CanvasTexture | null>(null)
   const textColorRef = useRef("#ffffff")
   const bgColorRef = useRef("#000000")
 
@@ -165,7 +150,6 @@ export default function Home() {
 
   const [params, setParams] = useState<Record<string, { value: number; min: number; max: number; step?: number }>>({})
   const [fps, setFps] = useState(60)
-  const fpsHistory = useRef<number[]>(Array(40).fill(60))
   const fpsFrames = useRef(0)
   const fpsStart = useRef(performance.now())
 
@@ -205,6 +189,9 @@ export default function Home() {
     if (effectRef.current) effectRef.current.dispose()
     const e = createEffect(name, rendererRef.current)
     e.mount(canvasTextureRef.current)
+    if (e instanceof MetaLogo && canvasTextureBlurRef.current) {
+      e.setTexture2(canvasTextureBlurRef.current)
+    }
     e.setColors(hexToRgb(textColorRef.current), hexToRgb(bgColorRef.current))
     effectRef.current = e
     setParams(e.getParams())
@@ -264,11 +251,8 @@ export default function Home() {
     // FPS
     fpsFrames.current++
     const elapsed = time - fpsStart.current
-    if (elapsed >= 200) {
-      const currentFps = Math.round(fpsFrames.current / (elapsed / 1000))
-      fpsHistory.current.push(currentFps)
-      if (fpsHistory.current.length > 40) fpsHistory.current.shift()
-      setFps(currentFps)
+    if (elapsed >= 500) {
+      setFps(Math.round(fpsFrames.current / (elapsed / 1000)))
       fpsFrames.current = 0
       fpsStart.current = time
     }
@@ -296,6 +280,10 @@ export default function Home() {
     canvasTextureRef.current = canvasTex
     canvasTex.update("ZENTR", "Inter")
 
+    const canvasTexBlur = new CanvasTexture(renderer.gl)
+    canvasTextureBlurRef.current = canvasTexBlur
+    canvasTexBlur.update("ZENTR", "Inter", 12)
+
     mountEffect(effectName)
     rafRef.current = requestAnimationFrame(loop)
 
@@ -322,11 +310,10 @@ export default function Home() {
     window.history.replaceState(null, "", url.toString())
   }, [effectName, mountEffect])
 
-  // re-render canvas texture when text or font changes
+  // re-render canvas textures when text or font changes
   useEffect(() => {
-    if (canvasTextureRef.current) {
-      canvasTextureRef.current.update(text, font)
-    }
+    if (canvasTextureRef.current) canvasTextureRef.current.update(text, font)
+    if (canvasTextureBlurRef.current) canvasTextureBlurRef.current.update(text, font, 12)
   }, [text, font])
 
   // push color changes into active effect + clear color
@@ -363,72 +350,39 @@ export default function Home() {
         ref={canvasRef}
         style={{ display: "block", width: "100%", height: "100%", position: "absolute", inset: 0 }}
       />
-      {/* ── Debug Panel ── */}
-      <div className="debug-panel">
-        {/* FPS */}
-        <div className="debug-section">
-          <div className="debug-header">
-            Debug
-            <span style={{ fontWeight: 400, color: "#aaa", textTransform: "none", letterSpacing: 0 }}>
-              {fps} FPS
-            </span>
-          </div>
-          <div className="fps-bar">
-            {fpsHistory.current.map((f, i) => (
-              <span key={i} style={{ height: `${Math.min(100, (f / 60) * 100)}%` }} />
+      <div className="panel">
+        {/* top row: effect picker + fps */}
+        <div className="panel-top">
+          <select
+            className="panel-select"
+            value={effectName}
+            onChange={(e) => setEffectName(e.target.value)}
+            style={{ flex: 1 }}
+          >
+            {EFFECT_ORDER.map((n) => (
+              <option key={n} value={n}>{n}</option>
             ))}
-          </div>
+          </select>
+          <span className="fps">{fps}</span>
         </div>
 
-        {/* Effects switcher */}
-        <div className="debug-section">
-          <div className="debug-header">effects</div>
-          <div className="debug-row" style={{ marginTop: 4 }}>
-            <label style={{ width: "auto", flex: 0 }}>share</label>
-            <button className="debug-btn" onClick={() => {
-              navigator.clipboard?.writeText(window.location.href)
-            }}>Share effect</button>
-          </div>
-          <div className="debug-row" style={{ marginTop: 2 }}>
-            <label style={{ width: "auto", flex: 0 }}>effect</label>
-            <select
-              className="debug-select"
-              value={effectName}
-              onChange={(e) => setEffectName(e.target.value)}
-            >
-              {EFFECT_ORDER.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <div className="panel-divider" />
 
-        {/* Brand / text controls */}
-        <div className="debug-section">
-          <div className="debug-header">text</div>
-          <div className="debug-row" style={{ marginTop: 2 }}>
-            <label style={{ width: "auto", flex: 0 }}>text</label>
+        {/* text + font + colors */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div className="panel-row">
+            <label>text</label>
             <input
               type="text"
+              className="panel-input"
               value={text}
               onChange={(e) => setText(e.target.value.toUpperCase())}
-              style={{
-                flex: 1,
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: 4,
-                color: "#fff",
-                fontFamily: "inherit",
-                fontSize: 11,
-                padding: "4px 6px",
-                outline: "none",
-              }}
             />
           </div>
-          <div className="debug-row" style={{ marginTop: 2 }}>
-            <label style={{ width: "auto", flex: 0 }}>font</label>
+          <div className="panel-row">
+            <label>font</label>
             <select
-              className="debug-select"
+              className="panel-select"
               value={font}
               onChange={(e) => setFont(e.target.value)}
             >
@@ -437,37 +391,30 @@ export default function Home() {
               ))}
             </select>
           </div>
-          <div className="debug-row" style={{ marginTop: 4 }}>
-            <label>text</label>
+          <div className="panel-row">
+            <label>color</label>
             <input
               type="color"
               value={textColor}
               onChange={(e) => setTextColor(e.target.value)}
-              style={{ width: 28, height: 22, border: "none", background: "none", cursor: "pointer", padding: 0 }}
+              style={{ width: 24, height: 20, border: "none", background: "none", cursor: "pointer", padding: 0 }}
             />
-            <label style={{ marginLeft: 8 }}>bg</label>
+            <label style={{ marginLeft: 4 }}>bg</label>
             <input
               type="color"
               value={bgColor}
               onChange={(e) => setBgColor(e.target.value)}
-              style={{ width: 28, height: 22, border: "none", background: "none", cursor: "pointer", padding: 0 }}
+              style={{ width: 24, height: 20, border: "none", background: "none", cursor: "pointer", padding: 0 }}
             />
           </div>
         </div>
 
-        {/* Per-effect params */}
-        <div className="debug-section">
-          <div className="debug-header">
-            {effectName === "RepeatOverlap" ? "repeat overlap parameters" :
-             effectName === "MetaLogo" ? "meta logo parameters" :
-             effectName === "MouseGrid" ? "mouse grid parameters" :
-             effectName === "Grid" ? "grid parameters" :
-             effectName === "SingleDistord" ? "single distord parameters" :
-             "double logo parameters"}
-          </div>
+        <div className="panel-divider" />
 
+        {/* per-effect sliders */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           {Object.entries(params).map(([key, def]: [string, any]) => (
-            <div className="debug-row" key={key}>
+            <div className="panel-row" key={key}>
               <label>{key.replace(/([A-Z])/g, " $1").toLowerCase()}</label>
               <input
                 type="range"
@@ -481,9 +428,8 @@ export default function Home() {
             </div>
           ))}
 
-          {/* Presets for RepeatOverlap */}
           {effectName === "RepeatOverlap" && (
-            <div className="preset-grid" style={{ marginTop: 6 }}>
+            <div className="preset-grid" style={{ marginTop: 2 }}>
               {Object.keys(RepeatOverlap.presets).map((name) => (
                 <button key={name} className="preset-btn" onClick={() => onPreset(name)}>
                   {name}
