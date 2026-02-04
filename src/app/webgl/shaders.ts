@@ -198,7 +198,6 @@ void main(){
     vec2 uv = vUv;
     float aspect = size.x / size.y;
     vec2 m = uMouse / size;
-    m.y = 1.0 - m.y;
 
     float mDist = distance(vec2(m.x, m.y/aspect), vec2(uv.x, uv.y/aspect)) * (24.0 - uSize);
 

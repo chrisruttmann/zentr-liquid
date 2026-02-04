@@ -159,6 +159,32 @@ export default function Home() {
   const fpsFrames = useRef(0)
   const fpsStart = useRef(performance.now())
 
+  // ─── brand / text overlay state ──────────────────────────────────────────
+  const [text, setText] = useState("ZENTR")
+  const [bgColor, setBgColor] = useState("#000000")
+  const [textColor, setTextColor] = useState("#ffffff")
+  const [font, setFont] = useState("Inter")
+
+  const FONTS = [
+    "Inter", "Geist", "Arial Black", "Impact",
+    "Bebas Neue", "Oswald", "Rajdhani", "Barlow Condensed",
+    "Montserrat", "Roboto Condensed", "Anton", "Fugaz One",
+  ]
+
+  // load Google Font dynamically when font changes
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    const safe = ["Arial Black", "Impact"] // system fonts, no fetch needed
+    if (safe.includes(font)) return
+    const id = `gf-${font.replace(/\s+/g, "-")}`
+    if (document.getElementById(id)) return
+    const link = document.createElement("link")
+    link.id = id
+    link.rel = "stylesheet"
+    link.href = `https://fonts.googleapis.com/css2?family=${font.replace(/\s+/g, "+")}:wght@700;900&display=swap`
+    document.head.appendChild(link)
+  }, [font])
+
   // ─── mount effect ──────────────────────────────────────────────────────────
   const mountEffect = useCallback((name: string) => {
     if (!rendererRef.current) return
@@ -185,21 +211,25 @@ export default function Home() {
       clientY = e.clientY
     }
 
-    const glX = clientX - rect.left
-    const glY = rect.height - (clientY - rect.top) // flip Y for WebGL
-    const normX = glX
-    const normY = glY
+    const dpr = window.devicePixelRatio || 1
+    const cssX = clientX - rect.left
+    const cssY = clientY - rect.top
+    // physical pixels, Y flipped for WebGL (Y=0 at bottom)
+    const physX = cssX * dpr
+    const physY = (rect.height - cssY) * dpr
 
     if ("onMouseMove" in effect && (effect as any).onMouseMove) {
       if (effect instanceof MouseGrid) {
+        // MouseGrid flowmap expects normalised 0-1, Y=0 at top
         ;(effect as MouseGrid).onMouseMove!(
-          glX / rect.width,
-          1 - (clientY - rect.top) / rect.height,
+          cssX / rect.width,
+          cssY / rect.height,
           clientX,
           clientY
         )
       } else {
-        ;(effect as any).onMouseMove!(normX, normY)
+        // MetaLogo / DoubleLogo expect physical pixels, Y=0 at bottom
+        ;(effect as any).onMouseMove!(physX, physY)
       }
     }
   }, [])
@@ -293,11 +323,31 @@ export default function Home() {
   const effect = effectRef.current
 
   return (
-    <div style={{ width: "100vw", height: "100vh", overflow: "hidden", background: "#fff" }}>
+    <div style={{ width: "100vw", height: "100vh", overflow: "hidden", background: bgColor, position: "relative" }}>
       <canvas
         ref={canvasRef}
-        style={{ display: "block", width: "100%", height: "100%" }}
+        style={{ display: "block", width: "100%", height: "100%", position: "absolute", inset: 0 }}
       />
+      {/* Text overlay — sits on top of the WebGL canvas */}
+      <div style={{
+        position: "absolute", inset: 0,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        pointerEvents: "none", zIndex: 1,
+      }}>
+        <span style={{
+          fontFamily: `"${font}", sans-serif`,
+          fontWeight: 900,
+          fontSize: "clamp(4rem, 15vw, 12rem)",
+          color: textColor,
+          letterSpacing: "-0.03em",
+          textTransform: "uppercase",
+          lineHeight: 1,
+          // mix-blend-mode so it composites nicely over the shader
+          mixBlendMode: "difference",
+        }}>
+          {text}
+        </span>
+      </div>
 
       {/* ── Debug Panel ── */}
       <div className="debug-panel">
@@ -336,6 +386,58 @@ export default function Home() {
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>
+          </div>
+        </div>
+
+        {/* Brand / text controls */}
+        <div className="debug-section">
+          <div className="debug-header">text</div>
+          <div className="debug-row" style={{ marginTop: 2 }}>
+            <label style={{ width: "auto", flex: 0 }}>text</label>
+            <input
+              type="text"
+              value={text}
+              onChange={(e) => setText(e.target.value.toUpperCase())}
+              style={{
+                flex: 1,
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 4,
+                color: "#fff",
+                fontFamily: "inherit",
+                fontSize: 11,
+                padding: "4px 6px",
+                outline: "none",
+              }}
+            />
+          </div>
+          <div className="debug-row" style={{ marginTop: 2 }}>
+            <label style={{ width: "auto", flex: 0 }}>font</label>
+            <select
+              className="debug-select"
+              value={font}
+              onChange={(e) => setFont(e.target.value)}
+            >
+              {FONTS.map((f) => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </select>
+          </div>
+          <div className="debug-row" style={{ marginTop: 4 }}>
+            <label>text</label>
+            <input
+              type="color"
+              value={textColor}
+              onChange={(e) => setTextColor(e.target.value)}
+              style={{ width: 28, height: 22, border: "none", background: "none", cursor: "pointer", padding: 0 }}
+            />
+            <label style={{ marginLeft: 8 }}>bg</label>
+            <input
+              type="color"
+              value={bgColor}
+              onChange={(e) => setBgColor(e.target.value)}
+              style={{ width: 28, height: 22, border: "none", background: "none", cursor: "pointer", padding: 0 }}
+            />
           </div>
         </div>
 
