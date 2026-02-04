@@ -156,13 +156,12 @@ export class Program {
     for (const name of ["position", "uv"]) {
       this.attribLocations[name] = gl.getAttribLocation(p, name)
     }
-    // uniforms
+    // uniforms — try uFoo, then Foo, then foo (lowercase first char)
     for (const name of Object.keys(this.uniforms)) {
-      this.uniformLocations[name] = gl.getUniformLocation(p, `u${name.charAt(0).toUpperCase()}${name.slice(1)}`)
-      // also try exact name
-      if (!this.uniformLocations[name]) {
-        this.uniformLocations[name] = gl.getUniformLocation(p, name)
-      }
+      this.uniformLocations[name] =
+        gl.getUniformLocation(p, `u${name.charAt(0).toUpperCase()}${name.slice(1)}`) ||
+        gl.getUniformLocation(p, name) ||
+        gl.getUniformLocation(p, `${name.charAt(0).toLowerCase()}${name.slice(1)}`)
     }
   }
 
@@ -190,9 +189,9 @@ export class Program {
         gl.uniform1f(loc, v)
       } else if (v instanceof Vec2) {
         gl.uniform2f(loc, v.x, v.y)
-      } else if (v instanceof Texture) {
+      } else if (v instanceof Texture || (v && typeof v === "object" && "texture" in v && (v as any).texture)) {
         gl.activeTexture(gl.TEXTURE0 + texUnit)
-        gl.bindTexture(gl.TEXTURE_2D, v.texture)
+        gl.bindTexture(gl.TEXTURE_2D, (v as any).texture)
         gl.uniform1i(loc, texUnit)
         texUnit++
       } else if (Array.isArray(v)) {
