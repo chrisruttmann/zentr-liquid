@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { Renderer, Vec2 } from "./webgl/renderer"
+import { Renderer, CanvasTexture } from "./webgl/renderer"
 import { Effect, createEffect, EFFECT_ORDER, RepeatOverlap, MetaLogo, DoubleLogo, MouseGrid } from "./webgl/effects"
 
 // ─── Debug panel styles (matches 27b exactly) ───────────────────────────────
@@ -136,12 +136,22 @@ const PANEL_CSS = `
 }
 `
 
+function hexToRgb(hex: string): [number, number, number] {
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  return [r, g, b]
+}
+
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<Renderer | null>(null)
   const effectRef = useRef<Effect | null>(null)
   const rafRef = useRef<number>(0)
   const lastTimeRef = useRef(0)
+  const canvasTextureRef = useRef<CanvasTexture | null>(null)
+  const textColorRef = useRef("#ffffff")
+  const bgColorRef = useRef("#000000")
 
   const [effectName, setEffectName] = useState(() => {
     if (typeof window === "undefined") return "MetaLogo"
@@ -185,12 +195,17 @@ export default function Home() {
     document.head.appendChild(link)
   }, [font])
 
+  // keep color refs in sync so mountEffect closure always has current values
+  useEffect(() => { textColorRef.current = textColor }, [textColor])
+  useEffect(() => { bgColorRef.current = bgColor }, [bgColor])
+
   // ─── mount effect ──────────────────────────────────────────────────────────
   const mountEffect = useCallback((name: string) => {
-    if (!rendererRef.current) return
+    if (!rendererRef.current || !canvasTextureRef.current) return
     if (effectRef.current) effectRef.current.dispose()
     const e = createEffect(name, rendererRef.current)
-    e.mount()
+    e.mount(canvasTextureRef.current)
+    e.setColors(hexToRgb(textColorRef.current), hexToRgb(bgColorRef.current))
     effectRef.current = e
     setParams(e.getParams())
   }, [])
@@ -274,8 +289,12 @@ export default function Home() {
     document.head.appendChild(style)
 
     const renderer = new Renderer(canvas)
-    renderer.clearColor(1, 1, 1, 1)
+    renderer.clearColor(0, 0, 0, 1)
     rendererRef.current = renderer
+
+    const canvasTex = new CanvasTexture(renderer.gl)
+    canvasTextureRef.current = canvasTex
+    canvasTex.update("ZENTR", "Inter")
 
     mountEffect(effectName)
     rafRef.current = requestAnimationFrame(loop)
@@ -303,6 +322,24 @@ export default function Home() {
     window.history.replaceState(null, "", url.toString())
   }, [effectName, mountEffect])
 
+  // re-render canvas texture when text or font changes
+  useEffect(() => {
+    if (canvasTextureRef.current) {
+      canvasTextureRef.current.update(text, font)
+    }
+  }, [text, font])
+
+  // push color changes into active effect + clear color
+  useEffect(() => {
+    if (effectRef.current) {
+      effectRef.current.setColors(hexToRgb(textColor), hexToRgb(bgColor))
+    }
+    if (rendererRef.current) {
+      const bg = hexToRgb(bgColor)
+      rendererRef.current.clearColor(bg[0], bg[1], bg[2], 1)
+    }
+  }, [textColor, bgColor])
+
   // ─── param change handler ──────────────────────────────────────────────────
   const onParamChange = (key: string, val: number) => {
     const effect = effectRef.current
@@ -320,35 +357,12 @@ export default function Home() {
     }
   }
 
-  const effect = effectRef.current
-
   return (
     <div style={{ width: "100vw", height: "100vh", overflow: "hidden", background: bgColor, position: "relative" }}>
       <canvas
         ref={canvasRef}
         style={{ display: "block", width: "100%", height: "100%", position: "absolute", inset: 0 }}
       />
-      {/* Text overlay — sits on top of the WebGL canvas */}
-      <div style={{
-        position: "absolute", inset: 0,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        pointerEvents: "none", zIndex: 1,
-      }}>
-        <span style={{
-          fontFamily: `"${font}", sans-serif`,
-          fontWeight: 900,
-          fontSize: "clamp(4rem, 15vw, 12rem)",
-          color: textColor,
-          letterSpacing: "-0.03em",
-          textTransform: "uppercase",
-          lineHeight: 1,
-          // mix-blend-mode so it composites nicely over the shader
-          mixBlendMode: "difference",
-        }}>
-          {text}
-        </span>
-      </div>
-
       {/* ── Debug Panel ── */}
       <div className="debug-panel">
         {/* FPS */}

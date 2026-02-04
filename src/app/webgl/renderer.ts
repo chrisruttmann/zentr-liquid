@@ -91,9 +91,64 @@ export class Texture {
   }
 }
 
+// ─── CanvasTexture ───────────────────────────────────────────────────────────
+// Renders text to an offscreen canvas → uploads as a WebGL texture each frame
+export class CanvasTexture {
+  gl: WebGL2RenderingContext
+  texture: WebGLTexture | null = null
+  canvas: HTMLCanvasElement
+  ctx: CanvasRenderingContext2D
+  width = 1024
+  height = 512
+
+  constructor(gl: WebGL2RenderingContext) {
+    this.gl = gl
+    this.texture = gl.createTexture()
+    this.canvas = document.createElement("canvas")
+    this.canvas.width = this.width
+    this.canvas.height = this.height
+    this.ctx = this.canvas.getContext("2d")!
+    this.upload() // valid black texture from frame 1
+  }
+
+  upload() {
+    const gl = this.gl
+    gl.bindTexture(gl.TEXTURE_2D, this.texture)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.canvas)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.bindTexture(gl.TEXTURE_2D, null)
+  }
+
+  draw(text: string, font: string, blur = 0) {
+    const { canvas, ctx } = this
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = "#000"
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    const fontSize = canvas.height * 0.7
+    ctx.font = `900 ${fontSize}px "${font}", sans-serif`
+    ctx.fillStyle = "#fff"
+    ctx.textAlign = "center"
+    ctx.textBaseline = "middle"
+    if (blur > 0) ctx.filter = `blur(${blur}px)`
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2)
+    ctx.filter = "none"
+    this.upload()
+  }
+
+  async update(text: string, font: string, blur = 0) {
+    try {
+      await document.fonts.load(`900 ${this.height}px "${font}"`)
+    } catch {}
+    this.draw(text, font, blur)
+  }
+}
+
 // ─── Program ─────────────────────────────────────────────────────────────────
 export interface UniformDef {
-  value: number | Vec2 | Texture | [number, number, number]
+  value: number | Vec2 | Texture | CanvasTexture | [number, number, number]
 }
 export type Uniforms = Record<string, UniformDef>
 
@@ -189,7 +244,7 @@ export class Program {
         gl.uniform1f(loc, v)
       } else if (v instanceof Vec2) {
         gl.uniform2f(loc, v.x, v.y)
-      } else if (v instanceof Texture || (v && typeof v === "object" && "texture" in v && (v as any).texture)) {
+      } else if (v instanceof Texture || v instanceof CanvasTexture || (v && typeof v === "object" && "texture" in v && (v as any).texture)) {
         gl.activeTexture(gl.TEXTURE0 + texUnit)
         gl.bindTexture(gl.TEXTURE_2D, (v as any).texture)
         gl.uniform1i(loc, texUnit)

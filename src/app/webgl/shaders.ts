@@ -180,6 +180,8 @@ uniform float uTime;
 uniform vec2 uMouse;
 uniform float uStrength;
 uniform float uSize;
+uniform vec3 uColor;
+uniform vec3 uBackground;
 in vec2 vUv;
 out vec4 FragColor;
 
@@ -214,9 +216,8 @@ void main(){
     float e = smax2(smax2(c, c + sdf, 5.0), sdf, 5.0);
     float f = e * (c / circle_factor) + (1.0 - (c / circle_factor)) * sdf;
 
-    vec3 color = vec3(0.0);
-    color.r = aastep(0.5, f);
-    FragColor = vec4(color, 1.0);
+    float logo = aastep(0.5, f);
+    FragColor = vec4(mix(uBackground, uColor, logo), 1.0);
 }
 `
 
@@ -231,6 +232,8 @@ uniform float uTime;
 uniform vec2 uMouse;
 uniform float uStrength;
 uniform float uPosStrength;
+uniform vec3 uColor;
+uniform vec3 uBackground;
 in vec2 vUv;
 out vec4 FragColor;
 
@@ -254,9 +257,8 @@ void main(){
     float sd1  = median(msd1.r, msd1.g, msd1.b);
     float sd2  = median(msd2.r, msd2.g, msd2.b);
 
-    vec3 color = vec3(0.0);
-    color.rgb = min(vec3(1.0), vec3(aastep(0.5, sd1) + aastep(0.5, sd2)));
-    FragColor = vec4(color, 1.0);
+    float logo = min(1.0, aastep(0.5, sd1) + aastep(0.5, sd2));
+    FragColor = vec4(mix(uBackground, uColor, logo), 1.0);
 }
 `
 
@@ -328,7 +330,7 @@ void main(){
     vec4 logo = fitTexture(uTexture, uSizeImage, textureUv, uScale);
     float alpha = aastep(0.5, median(logo.r, logo.g, logo.b));
 
-    vec3 color = mix(uColor, uBackground, alpha);
+    vec3 color = mix(uBackground, uColor, alpha);
     FragColor.rgb = color;
     FragColor.a   = 1.0;
 }

@@ -2,7 +2,7 @@ import {
   Renderer,
   Mesh,
   Program,
-  Texture,
+  CanvasTexture,
   Vec2,
   createFullScreenTriangle,
   Geometry,
@@ -29,6 +29,7 @@ export abstract class Effect {
   renderer: Renderer
   mesh: Mesh | null = null
   geometry: Geometry
+  canvasTexture: CanvasTexture | null = null
 
   constructor(renderer: Renderer) {
     this.renderer = renderer
@@ -36,33 +37,36 @@ export abstract class Effect {
     this.geometry.upload(renderer.gl)
   }
 
-  abstract mount(): void
+  abstract mount(canvasTexture: CanvasTexture): void
   abstract tick(time: number, delta: number): void
   abstract getParams(): Record<string, { value: number; min: number; max: number; step?: number }>
   abstract setParam(key: string, val: number): void
 
-  dispose() {
-    // cleanup if needed
+  setColors(fg: [number, number, number], bg: [number, number, number]) {
+    if (!this.mesh) return
+    if (this.mesh.uniforms.Color) this.mesh.uniforms.Color.value = fg
+    if (this.mesh.uniforms.Background) this.mesh.uniforms.Background.value = bg
   }
+
+  dispose() {}
 }
 
 // ─── SingleDistord ───────────────────────────────────────────────────────────
 export class SingleDistord extends Effect {
   name = "SingleDistord"
   params = { scale: 0.7 }
-  texture: Texture | null = null
 
-  mount() {
+  mount(canvasTexture: CanvasTexture) {
     const gl = this.renderer.gl
-    this.texture = new Texture(gl, "/msdf_small.png")
+    this.canvasTexture = canvasTexture
     this.mesh = new Mesh(
       this.geometry,
       new Program(gl, VERTEX_SHADER, SINGLE_DISTORD_FS, {
-        Texture: { value: this.texture },
+        Texture: { value: canvasTexture },
         Color: { value: [1, 1, 1] as [number, number, number] },
         Background: { value: [0, 0, 0] as [number, number, number] },
         Size: { value: new Vec2(this.renderer.width, this.renderer.height) },
-        SizeImage: { value: new Vec2(390, 171) },
+        SizeImage: { value: new Vec2(canvasTexture.width, canvasTexture.height) },
         Time: { value: 0 },
         Scale: { value: this.params.scale },
         BarrelStrength: { value: -1.4 },
@@ -72,10 +76,11 @@ export class SingleDistord extends Effect {
   }
 
   tick(time: number) {
-    if (!this.mesh) return
+    if (!this.mesh || !this.canvasTexture) return
     this.mesh.uniforms.Time.value = time * 0.001
     this.mesh.uniforms.Size.value = new Vec2(this.renderer.width, this.renderer.height)
-    if (this.texture) this.mesh.uniforms.Texture.value = this.texture
+    this.mesh.uniforms.Texture.value = this.canvasTexture
+    this.mesh.uniforms.SizeImage.value = new Vec2(this.canvasTexture.width, this.canvasTexture.height)
   }
 
   getParams() {
@@ -93,19 +98,18 @@ export class SingleDistord extends Effect {
 export class Grid extends Effect {
   name = "Grid"
   params = { scale: 0.8, repeatX: 5, repeatY: 5 }
-  texture: Texture | null = null
 
-  mount() {
+  mount(canvasTexture: CanvasTexture) {
     const gl = this.renderer.gl
-    this.texture = new Texture(gl, "/msdf_small.png")
+    this.canvasTexture = canvasTexture
     this.mesh = new Mesh(
       this.geometry,
       new Program(gl, VERTEX_SHADER, GRID_FS, {
-        Texture: { value: this.texture },
-        Color: { value: [0.87, 0, 0.004] as [number, number, number] }, // #DF0001
+        Texture: { value: canvasTexture },
+        Color: { value: [0.87, 0, 0.004] as [number, number, number] },
         Background: { value: [0, 0, 0] as [number, number, number] },
         Size: { value: new Vec2(this.renderer.width, this.renderer.height) },
-        SizeImage: { value: new Vec2(390, 171) },
+        SizeImage: { value: new Vec2(canvasTexture.width, canvasTexture.height) },
         Repeat: { value: new Vec2(this.params.repeatX, this.params.repeatY) },
         Time: { value: 0 },
         Scale: { value: this.params.scale },
@@ -116,10 +120,11 @@ export class Grid extends Effect {
   }
 
   tick(time: number) {
-    if (!this.mesh) return
+    if (!this.mesh || !this.canvasTexture) return
     this.mesh.uniforms.Time.value = time * 0.001
     this.mesh.uniforms.Size.value = new Vec2(this.renderer.width, this.renderer.height)
-    if (this.texture) this.mesh.uniforms.Texture.value = this.texture
+    this.mesh.uniforms.Texture.value = this.canvasTexture
+    this.mesh.uniforms.SizeImage.value = new Vec2(this.canvasTexture.width, this.canvasTexture.height)
   }
 
   getParams() {
@@ -157,7 +162,6 @@ export class RepeatOverlap extends Effect {
     offsetSinusX: 1,
     offsetSinusY: 2,
   }
-  texture: Texture | null = null
 
   static presets: Record<string, typeof RepeatOverlap.prototype.params> = {
     "bottom to top": {
@@ -178,17 +182,17 @@ export class RepeatOverlap extends Effect {
     },
   }
 
-  mount() {
+  mount(canvasTexture: CanvasTexture) {
     const gl = this.renderer.gl
-    this.texture = new Texture(gl, "/msdf_small.png")
+    this.canvasTexture = canvasTexture
     this.mesh = new Mesh(
       this.geometry,
       new Program(gl, VERTEX_SHADER, REPEAT_OVERLAP_FS, {
-        Texture: { value: this.texture },
+        Texture: { value: canvasTexture },
         Color: { value: [0, 0, 0] as [number, number, number] },
         Background: { value: [0.87, 0, 0.004] as [number, number, number] },
         Size: { value: new Vec2(this.renderer.width, this.renderer.height) },
-        SizeImage: { value: new Vec2(390, 171) },
+        SizeImage: { value: new Vec2(canvasTexture.width, canvasTexture.height) },
         Time: { value: 0 },
         Scale: { value: 1.5 },
         TimeSpeed: { value: this.params.timeSpeed },
@@ -200,10 +204,11 @@ export class RepeatOverlap extends Effect {
   }
 
   tick(time: number) {
-    if (!this.mesh) return
+    if (!this.mesh || !this.canvasTexture) return
     this.mesh.uniforms.Time.value = time * 0.001
     this.mesh.uniforms.Size.value = new Vec2(this.renderer.width, this.renderer.height)
-    if (this.texture) this.mesh.uniforms.Texture.value = this.texture
+    this.mesh.uniforms.Texture.value = this.canvasTexture
+    this.mesh.uniforms.SizeImage.value = new Vec2(this.canvasTexture.width, this.canvasTexture.height)
   }
 
   applyPreset(name: string) {
@@ -247,34 +252,33 @@ export class RepeatOverlap extends Effect {
 export class MetaLogo extends Effect {
   name = "MetaLogo"
   params = { strength: 39, size: 20, lerpStrength: 0.4 }
-  tex1: Texture | null = null
-  tex2: Texture | null = null
 
   mouse = new Vec2()
   prevMouse = new Vec2()
 
   onMouseMove: ((x: number, y: number) => void) | null = null
 
-  mount() {
+  mount(canvasTexture: CanvasTexture) {
     const gl = this.renderer.gl
-    this.tex1 = new Texture(gl, "/msdf_sharp.png")
-    this.tex2 = new Texture(gl, "/sdf_rounded.png")
+    this.canvasTexture = canvasTexture
     this.mesh = new Mesh(
       this.geometry,
       new Program(gl, VERTEX_SHADER, META_LOGO_FS, {
-        Texture1: { value: this.tex1 },
-        Texture2: { value: this.tex2 },
+        Texture1: { value: canvasTexture },
+        Texture2: { value: canvasTexture },
+        Color: { value: [1, 1, 1] as [number, number, number] },
+        Background: { value: [0, 0, 0] as [number, number, number] },
         Size: { value: new Vec2(this.renderer.width, this.renderer.height) },
-        SizeImage: { value: new Vec2(1000, 1000) },
+        SizeImage: { value: new Vec2(canvasTexture.width, canvasTexture.height) },
         Scale: { value: 1 },
         Time: { value: 0 },
         Mouse: { value: this.prevMouse },
         Strength: { value: this.params.strength },
-        Size2: { value: this.params.size }, // named Size2 internally but maps to uSize
+        Size2: { value: this.params.size },
       })
     )
 
-    // fix: uSize uniform location manually
+    // fix: uSize uniform location manually (conflicts with viewport "size")
     if (this.mesh.program.program) {
       const sizeLoc = gl.getUniformLocation(this.mesh.program.program, "uSize")
       if (sizeLoc) {
@@ -288,7 +292,7 @@ export class MetaLogo extends Effect {
   }
 
   tick(time: number, delta: number) {
-    if (!this.mesh) return
+    if (!this.mesh || !this.canvasTexture) return
     const ds = delta / 1000
 
     this.prevMouse.x = elerp(this.prevMouse.x, this.mouse.x, this.params.lerpStrength, ds)
@@ -299,8 +303,9 @@ export class MetaLogo extends Effect {
     this.mesh.uniforms.Size.value = new Vec2(this.renderer.width, this.renderer.height)
     this.mesh.uniforms.Strength.value = this.params.strength
     this.mesh.uniforms.Size2.value = this.params.size
-    if (this.tex1) this.mesh.uniforms.Texture1.value = this.tex1
-    if (this.tex2) this.mesh.uniforms.Texture2.value = this.tex2
+    this.mesh.uniforms.Texture1.value = this.canvasTexture
+    this.mesh.uniforms.Texture2.value = this.canvasTexture
+    this.mesh.uniforms.SizeImage.value = new Vec2(this.canvasTexture.width, this.canvasTexture.height)
   }
 
   getParams() {
@@ -319,7 +324,6 @@ export class MetaLogo extends Effect {
 export class DoubleLogo extends Effect {
   name = "DoubleLogo"
   params = { lerpStrength: 0.4 }
-  texture: Texture | null = null
 
   mouse = new Vec2()
   prevMouse = new Vec2()
@@ -332,15 +336,17 @@ export class DoubleLogo extends Effect {
 
   onMouseMove: ((x: number, y: number) => void) | null = null
 
-  mount() {
+  mount(canvasTexture: CanvasTexture) {
     const gl = this.renderer.gl
-    this.texture = new Texture(gl, "/msdf_small.png")
+    this.canvasTexture = canvasTexture
     this.mesh = new Mesh(
       this.geometry,
       new Program(gl, VERTEX_SHADER, DOUBLE_LOGO_FS, {
-        Texture: { value: this.texture },
+        Texture: { value: canvasTexture },
+        Color: { value: [1, 1, 1] as [number, number, number] },
+        Background: { value: [0, 0, 0] as [number, number, number] },
         Size: { value: new Vec2(this.renderer.width, this.renderer.height) },
-        SizeImage: { value: new Vec2(390, 171) },
+        SizeImage: { value: new Vec2(canvasTexture.width, canvasTexture.height) },
         Scale: { value: 0.7 },
         Time: { value: 0 },
         Mouse: { value: this.prevMouse },
@@ -361,7 +367,7 @@ export class DoubleLogo extends Effect {
   }
 
   tick(time: number, delta: number) {
-    if (!this.mesh) return
+    if (!this.mesh || !this.canvasTexture) return
     const ds = delta / 1000
 
     this.prevMouse.x = elerp(this.prevMouse.x, this.mouse.x, this.params.lerpStrength, ds)
@@ -374,7 +380,8 @@ export class DoubleLogo extends Effect {
     this.mesh.uniforms.PosStrength.value = this.prevPosStrength
     this.mesh.uniforms.Time.value = time * 0.001
     this.mesh.uniforms.Size.value = new Vec2(this.renderer.width, this.renderer.height)
-    if (this.texture) this.mesh.uniforms.Texture.value = this.texture
+    this.mesh.uniforms.Texture.value = this.canvasTexture
+    this.mesh.uniforms.SizeImage.value = new Vec2(this.canvasTexture.width, this.canvasTexture.height)
   }
 
   getParams() {
@@ -396,7 +403,6 @@ export class DoubleLogo extends Effect {
 export class MouseGrid extends Effect {
   name = "MouseGrid"
   params = { gridSize: 30, mouseRadius: 0.3, dissipation: 0.88 }
-  texture: Texture | null = null
   flowmap: Flowmap | null = null
 
   mouse = new Vec2(-1, -1)
@@ -407,9 +413,9 @@ export class MouseGrid extends Effect {
 
   onMouseMove: ((x: number, y: number, screenX: number, screenY: number) => void) | null = null
 
-  mount() {
+  mount(canvasTexture: CanvasTexture) {
     const gl = this.renderer.gl
-    this.texture = new Texture(gl, "/msdf_small.png")
+    this.canvasTexture = canvasTexture
     this.flowmap = new Flowmap(this.renderer)
     this.flowmap.dissipation = this.params.dissipation
     this.flowmap.falloff = this.params.mouseRadius
@@ -417,11 +423,11 @@ export class MouseGrid extends Effect {
     this.mesh = new Mesh(
       this.geometry,
       new Program(gl, VERTEX_SHADER, MOUSE_GRID_FS, {
-        Texture: { value: this.texture },
+        Texture: { value: canvasTexture },
         Flow: { value: this.flowmap.flowTexture as any },
         Color: { value: [1, 1, 1] as [number, number, number] },
         Background: { value: [0, 0, 0] as [number, number, number] },
-        SizeImage: { value: new Vec2(390, 171) },
+        SizeImage: { value: new Vec2(canvasTexture.width, canvasTexture.height) },
         Resolution: { value: new Vec2(this.renderer.width, this.renderer.height) },
         Time: { value: 0 },
         Size: { value: new Vec2(this.renderer.width, this.renderer.height) },
@@ -450,7 +456,7 @@ export class MouseGrid extends Effect {
   }
 
   tick(time: number) {
-    if (!this.mesh || !this.flowmap) return
+    if (!this.mesh || !this.flowmap || !this.canvasTexture) return
 
     if (!this.velocityNeedsUpdate) {
       this.flowmap.mouse.set(-1, -1)
@@ -459,19 +465,18 @@ export class MouseGrid extends Effect {
     this.velocityNeedsUpdate = false
 
     this.flowmap.mouse.copy(this.mouse)
-    // lerp velocity
     const lerpAmt = this.velocity.x !== 0 || this.velocity.y !== 0 ? 0.5 : 0.1
     this.flowmap.velocity.x += (this.velocity.x - this.flowmap.velocity.x) * lerpAmt
     this.flowmap.velocity.y += (this.velocity.y - this.flowmap.velocity.y) * lerpAmt
     this.flowmap.update()
 
-    // update uniforms
     this.mesh.uniforms.Time.value = time * 0.001
     this.mesh.uniforms.Size.value = new Vec2(this.renderer.width, this.renderer.height)
     this.mesh.uniforms.Resolution.value = new Vec2(this.renderer.width, this.renderer.height)
     this.mesh.uniforms.Mouse.value = this.mouse
     this.mesh.uniforms.GridSize.value = this.params.gridSize
-    if (this.texture) this.mesh.uniforms.Texture.value = this.texture
+    this.mesh.uniforms.Texture.value = this.canvasTexture
+    this.mesh.uniforms.SizeImage.value = new Vec2(this.canvasTexture.width, this.canvasTexture.height)
     if (this.flowmap.flowTexture.texture) {
       this.mesh.uniforms.Flow.value = this.flowmap.flowTexture as any
     }
