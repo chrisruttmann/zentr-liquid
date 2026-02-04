@@ -128,6 +128,11 @@ export class CanvasTexture {
     ctx.fillStyle = "#000"
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     const fontSize = canvas.height * 0.7
+    // Flip Y: canvas row-0 = top, but texImage2D maps row-0 → v=0 (bottom).
+    // Drawing flipped here cancels the upload flip → right-side up in shader.
+    ctx.save()
+    ctx.translate(0, canvas.height)
+    ctx.scale(1, -1)
     ctx.font = `900 ${fontSize}px "${font}", sans-serif`
     ctx.fillStyle = "#fff"
     ctx.textAlign = "center"
@@ -135,6 +140,7 @@ export class CanvasTexture {
     if (blur > 0) ctx.filter = `blur(${blur}px)`
     ctx.fillText(text, canvas.width / 2, canvas.height / 2)
     ctx.filter = "none"
+    ctx.restore()
     this.upload()
   }
 

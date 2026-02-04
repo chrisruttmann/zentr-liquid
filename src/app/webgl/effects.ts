@@ -278,11 +278,17 @@ export class MetaLogo extends Effect {
       })
     )
 
-    // fix: uSize uniform location manually (conflicts with viewport "size")
+    // MetaLogo declares both "uniform vec2 size" and "uniform float uSize".
+    // The resolver tries uSize first for key "Size", finds the float — wrong.
+    // Override both locations manually.
     if (this.mesh.program.program) {
-      const sizeLoc = gl.getUniformLocation(this.mesh.program.program, "uSize")
-      if (sizeLoc) {
-        this.mesh.program.uniformLocations["Size2"] = sizeLoc
+      const sizeFloatLoc = gl.getUniformLocation(this.mesh.program.program, "uSize")
+      if (sizeFloatLoc) {
+        this.mesh.program.uniformLocations["Size2"] = sizeFloatLoc
+      }
+      const sizeVec2Loc = gl.getUniformLocation(this.mesh.program.program, "size")
+      if (sizeVec2Loc) {
+        this.mesh.program.uniformLocations["Size"] = sizeVec2Loc
       }
     }
 
